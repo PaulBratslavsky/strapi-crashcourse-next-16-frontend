@@ -68,35 +68,36 @@ export async function getAuth(): Promise<TAuthUser | null> {
   }
 
   // Validate with Strapi using api utility
-  try {
-    const response = await api.get<TAuthUser>(`${BASE_URL}/api/users/me`, {
-      authToken: jwt,
-    })
+  const response = await api.get<TAuthUser>(`${BASE_URL}/api/users/me`, {
+    authToken: jwt,
+  })
 
-    if (!response.success || !response.data) {
-      throw new Error('Failed to fetch user')
+  // Handle failed responses
+  if (!response.success || !response.data) {
+    // 401 is expected for expired/invalid tokens - clear session silently
+    if (response.status === 401) {
+      authCache.delete(jwt)
+      await clearAuth()
+      return null
     }
 
-    const user = response.data
-
-    // Success: cache and return user
-    authCache.set(jwt, { user, timestamp: Date.now() })
-
-    return user
-  } catch (error) {
-    // Invalid token or network error
-    console.error('Auth validation error:', error)
-
-    // If we have cached data, return it during network issues
+    // For other errors, log and use cache if available
+    console.error('Auth validation error:', response.error)
     if (cached) {
       return cached.user
     }
 
-    // Invalid token: clear session and cache
     authCache.delete(jwt)
     await clearAuth()
     return null
   }
+
+  const user = response.data
+
+  // Success: cache and return user
+  authCache.set(jwt, { user, timestamp: Date.now() })
+
+  return user
 }
 
 /**

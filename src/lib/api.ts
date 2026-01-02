@@ -84,7 +84,8 @@ export async function apiRequest<T = unknown, P = Record<string, unknown>>(
     const data = await response.json()
 
     if (!response.ok) {
-      if (response.status !== 402) {
+      // Don't log 401 (expired tokens are expected) or 402 (payment required)
+      if (response.status !== 401 && response.status !== 402) {
         console.error(`API ${method} error (${response.status}):`, {
           url,
           status: response.status,
